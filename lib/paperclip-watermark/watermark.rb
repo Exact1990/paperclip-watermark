@@ -10,7 +10,7 @@
 module Paperclip
   class Watermark < Processor
     # Handles watermarking of images that are uploaded.
-    attr_accessor :current_geometry, :target_geometry, :format, :whiny, :convert_options, :watermark_path, :overlay, :position
+    attr_accessor :current_geometry, :target_geometry, :format, :whiny, :convert_options, :watermark, :overlay, :position
 
     def initialize file, options = {}, attachment = nil
       super
@@ -24,7 +24,7 @@ module Paperclip
       @convert_options  = options[:convert_options]
       @whiny            = options[:whiny].nil? ? true : options[:whiny]
       @format           = options[:format]
-      @watermark_path   = options[:watermark_path]
+      @watermark        = options[:watermark]
       @position         = options[:position].nil? ? "SouthEast" : options[:position]
       @overlay          = options[:overlay].nil? ? true : false
       @current_format   = File.extname(@file.path)
@@ -59,12 +59,18 @@ module Paperclip
         raise Paperclip::Errors::CommandNotFoundError, "There was an error resizing and cropping #{@basename}" if @whiny
       end
 
-      if watermark_path
-        command = "composite"
-        params = %W[-gravity #{@position} #{watermark_path} #{tofile(dst)}]
+      if watermark
+        command = "convert"
+        params = %W[-gravity south -splice 0x13 -background #d59250 #{tofile(dst)}]
         params << tofile(dst)
         begin
           success = Paperclip.run(command, params.flatten.compact.collect{|e| "'#{e}'"}.join(" "))
+        rescue Paperclip::Errors::CommandNotFoundError
+          raise Paperclip::Errors::CommandNotFoundError, "There was an error processing the watermark for #{@basename}" if @whiny
+        end
+
+        begin
+          success = Paperclip.run("convert", "-gravity SouthEast -draw \"text 0,0 'naydi.travel'\" #{tofile(dst)}  #{tofile(dst)}")
         rescue Paperclip::Errors::CommandNotFoundError
           raise Paperclip::Errors::CommandNotFoundError, "There was an error processing the watermark for #{@basename}" if @whiny
         end
